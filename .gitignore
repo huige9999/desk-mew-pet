@@ -26,3 +26,6 @@ dist-ssr
 # Tauri / Rust
 src-tauri/target
 src-tauri/.cargo
+
+# repomix
+repomix.output.md
