@@ -8,6 +8,9 @@ use std::{
   thread,
 };
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, State};
@@ -15,6 +18,9 @@ use tauri::{AppHandle, Emitter, State};
 const EVENT_STREAM_CHUNK: &str = "qwen_stream_chunk";
 const EVENT_STREAM_ERROR: &str = "qwen_stream_error";
 const EVENT_FIRST_SEND_FAILED: &str = "qwen_first_send_failed";
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 const FIRST_SEND_FAILED_TITLE: &str = "qwen-cli 不可用";
 const FIRST_SEND_FAILED_MESSAGE: &str =
@@ -253,6 +259,7 @@ fn build_qwen_headless_command(prompt: &str, use_continue: bool) -> Command {
   #[cfg(target_os = "windows")]
   let mut command = {
     let mut cmd = Command::new("cmd.exe");
+    cmd.creation_flags(CREATE_NO_WINDOW);
     cmd.arg("/C");
     cmd.arg("qwen.cmd");
     cmd

@@ -225,49 +225,33 @@ app.innerHTML = `
   </div>
 `
 
-const pet = document.querySelector<HTMLDivElement>('#pet')
-const chatForm = document.querySelector<HTMLFormElement>('#chat-form')
-const chatInput = document.querySelector<HTMLInputElement>('#chat-input')
-const chatBubble = document.querySelector<HTMLButtonElement>('#chat-bubble')
-const firstFailModal = document.querySelector<HTMLDivElement>('#first-fail-modal')
-const firstFailTitle = document.querySelector<HTMLHeadingElement>('#fail-title')
-const firstFailMessage = document.querySelector<HTMLParagraphElement>('#fail-message')
-const firstFailAck = document.querySelector<HTMLButtonElement>('#fail-ack')
-const firstFailRetry = document.querySelector<HTMLButtonElement>('#fail-retry')
-const providerConfigTrigger = document.querySelector<HTMLButtonElement>('#provider-config-trigger')
-const providerConfigModal = document.querySelector<HTMLDivElement>('#provider-config-modal')
-const providerConfigApiKey = document.querySelector<HTMLInputElement>('#provider-openai-api-key')
-const providerConfigBaseUrl = document.querySelector<HTMLInputElement>('#provider-openai-base-url')
-const providerConfigModel = document.querySelector<HTMLInputElement>('#provider-openai-model')
-const providerConfigWorkingDirectory = document.querySelector<HTMLInputElement>('#provider-working-directory')
-const providerConfigApprovalMode = document.querySelector<HTMLSelectElement>('#provider-approval-mode')
-const providerConfigCancel = document.querySelector<HTMLButtonElement>('#provider-config-cancel')
-const providerConfigClear = document.querySelector<HTMLButtonElement>('#provider-config-clear')
-const providerConfigSave = document.querySelector<HTMLButtonElement>('#provider-config-save')
-
-if (
-  !pet ||
-  !chatForm ||
-  !chatInput ||
-  !chatBubble ||
-  !firstFailModal ||
-  !firstFailTitle ||
-  !firstFailMessage ||
-  !firstFailAck ||
-  !firstFailRetry ||
-  !providerConfigTrigger ||
-  !providerConfigModal ||
-  !providerConfigApiKey ||
-  !providerConfigBaseUrl ||
-  !providerConfigModel ||
-  !providerConfigWorkingDirectory ||
-  !providerConfigApprovalMode ||
-  !providerConfigCancel ||
-  !providerConfigClear ||
-  !providerConfigSave
-) {
-  throw new Error('Pet UI elements were not initialized correctly')
+function requireElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector)
+  if (!element) {
+    throw new Error(`Missing required UI element: ${selector}`)
+  }
+  return element
 }
+
+const pet = requireElement<HTMLDivElement>('#pet')
+const chatForm = requireElement<HTMLFormElement>('#chat-form')
+const chatInput = requireElement<HTMLInputElement>('#chat-input')
+const chatBubble = requireElement<HTMLButtonElement>('#chat-bubble')
+const firstFailModal = requireElement<HTMLDivElement>('#first-fail-modal')
+const firstFailTitle = requireElement<HTMLHeadingElement>('#fail-title')
+const firstFailMessage = requireElement<HTMLParagraphElement>('#fail-message')
+const firstFailAck = requireElement<HTMLButtonElement>('#fail-ack')
+const firstFailRetry = requireElement<HTMLButtonElement>('#fail-retry')
+const providerConfigTrigger = requireElement<HTMLButtonElement>('#provider-config-trigger')
+const providerConfigModal = requireElement<HTMLDivElement>('#provider-config-modal')
+const providerConfigApiKey = requireElement<HTMLInputElement>('#provider-openai-api-key')
+const providerConfigBaseUrl = requireElement<HTMLInputElement>('#provider-openai-base-url')
+const providerConfigModel = requireElement<HTMLInputElement>('#provider-openai-model')
+const providerConfigWorkingDirectory = requireElement<HTMLInputElement>('#provider-working-directory')
+const providerConfigApprovalMode = requireElement<HTMLSelectElement>('#provider-approval-mode')
+const providerConfigCancel = requireElement<HTMLButtonElement>('#provider-config-cancel')
+const providerConfigClear = requireElement<HTMLButtonElement>('#provider-config-clear')
+const providerConfigSave = requireElement<HTMLButtonElement>('#provider-config-save')
 
 const PET_STATE_CLASS: Record<PetAnimState, string> = {
   idle: 'state-idle',
