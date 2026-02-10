@@ -173,6 +173,63 @@ body {
   outline-offset: 2px;
 }
 
+.dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(26, 19, 11, 0.45);
+  pointer-events: auto;
+  z-index: 30;
+}
+
+.dialog-card {
+  width: min(320px, calc(100% - 24px));
+  border-radius: 14px;
+  border: 1px solid rgba(113, 82, 42, 0.35);
+  background: rgba(255, 249, 239, 0.98);
+  box-shadow: 0 12px 30px rgba(49, 33, 13, 0.3);
+  padding: 14px 14px 12px;
+}
+
+.dialog-title {
+  margin: 0;
+  color: #3f2f20;
+  font: 700 16px/1.2 "Avenir Next", "Nunito", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.dialog-message {
+  margin: 10px 0 12px;
+  color: #4b3928;
+  font: 500 13px/1.5 "Avenir Next", "Nunito", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dialog-btn {
+  border: 1px solid rgba(119, 89, 45, 0.4);
+  border-radius: 10px;
+  background: rgba(255, 250, 241, 1);
+  color: #4b3621;
+  font: 600 13px/1 "Avenir Next", "Nunito", "PingFang SC", "Microsoft YaHei", sans-serif;
+  padding: 8px 11px;
+  cursor: pointer;
+}
+
+.dialog-btn-primary {
+  background: rgba(243, 186, 118, 0.95);
+  border-color: rgba(181, 125, 59, 0.75);
+}
+
+.dialog-btn:focus-visible {
+  outline: 2px solid rgba(192, 118, 42, 0.66);
+  outline-offset: 1px;
+}
+
 .hidden {
   display: none;
 }
