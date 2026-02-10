@@ -1,5 +1,5 @@
 import './style.css'
-import { LogicalPosition, getCurrentWindow, primaryMonitor } from '@tauri-apps/api/window'
+import { PhysicalPosition, getCurrentWindow, primaryMonitor } from '@tauri-apps/api/window'
 
 type PetAnimState = 'idle' | 'drag' | 'tap_react'
 
@@ -17,18 +17,24 @@ type MonitorLike = {
 
 type PointerTrack = {
   pointerId: number
-  downAt: number
   startX: number
   startY: number
   dragTriggered: boolean
 }
 
-const WALK_INTERVAL_MS = 2000
-const WALK_DISTANCE_PX = 10
-const HOLD_MS = 200
-const MOVE_THRESHOLD_PX = 4
+type Direction = { x: number; y: number }
+
+const WALK_INTERVAL_MS = 1500
+const WALK_DISTANCE_PX = 24
+const DRAG_TRIGGER_THRESHOLD_PX = 2
+const CLICK_MOVE_THRESHOLD_PX = 4
 const TYPEWRITER_MS = 35
-const BUBBLE_AUTO_HIDE_MS = 3000
+const WALK_DIRECTIONS: Direction[] = [
+  { x: 0, y: -1 },
+  { x: 0, y: 1 },
+  { x: -1, y: 0 },
+  { x: 1, y: 0 }
+]
 
 const EMPTY_INPUT_HINT = '请说点什么～'
 
@@ -65,7 +71,6 @@ let inputVisible = false
 
 let walkTimer: number | null = null
 let typeTimer: number | null = null
-let bubbleHideTimer: number | null = null
 
 const app = document.querySelector<HTMLDivElement>('#app')
 if (!app) {
@@ -141,6 +146,27 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
 
+function getRandomDirectionOrder(): Direction[] {
+  const next = [...WALK_DIRECTIONS]
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1))
+    const value = next[index]
+    next[index] = next[swapIndex]
+    next[swapIndex] = value
+  }
+  return next
+}
+
+async function setWindowPosition(x: number, y: number, reason: string): Promise<boolean> {
+  try {
+    await appWindow.setPosition(new PhysicalPosition(Math.round(x), Math.round(y)))
+    return true
+  } catch (error) {
+    console.error(`[mew] failed to set window position (${reason})`, error)
+    return false
+  }
+}
+
 async function getMainWorkArea(): Promise<RectLike> {
   const monitor = await primaryMonitor() as MonitorLike | null
   if (monitor) {
@@ -167,22 +193,26 @@ async function getMainWorkArea(): Promise<RectLike> {
 }
 
 async function clampWindowToBounds(): Promise<void> {
-  const [position, size, workArea] = await Promise.all([
-    appWindow.outerPosition() as Promise<PositionLike>,
-    appWindow.outerSize() as Promise<SizeLike>,
-    getMainWorkArea()
-  ])
+  try {
+    const [position, size, workArea] = await Promise.all([
+      appWindow.outerPosition() as Promise<PositionLike>,
+      appWindow.outerSize() as Promise<SizeLike>,
+      getMainWorkArea()
+    ])
 
-  const minX = workArea.x
-  const minY = workArea.y
-  const maxX = workArea.x + workArea.width - size.width
-  const maxY = workArea.y + workArea.height - size.height
+    const minX = workArea.x
+    const minY = workArea.y
+    const maxX = workArea.x + workArea.width - size.width
+    const maxY = workArea.y + workArea.height - size.height
 
-  const x = clamp(position.x, minX, maxX)
-  const y = clamp(position.y, minY, maxY)
+    const x = clamp(position.x, minX, maxX)
+    const y = clamp(position.y, minY, maxY)
 
-  if (x !== position.x || y !== position.y) {
-    await appWindow.setPosition(new LogicalPosition(x, y))
+    if (x !== position.x || y !== position.y) {
+      await setWindowPosition(x, y, 'clamp-to-bounds')
+    }
+  } catch (error) {
+    console.error('[mew] failed to clamp window bounds', error)
   }
 }
 
@@ -194,13 +224,43 @@ async function randomWalkStep(): Promise<void> {
   walkBusy = true
 
   try {
-    const position = await appWindow.outerPosition() as PositionLike
-    const angle = Math.random() * Math.PI * 2
-    const dx = Math.round(Math.cos(angle) * WALK_DISTANCE_PX)
-    const dy = Math.round(Math.sin(angle) * WALK_DISTANCE_PX)
+    const [rawPosition, size, workArea] = await Promise.all([
+      appWindow.outerPosition() as Promise<PositionLike>,
+      appWindow.outerSize() as Promise<SizeLike>,
+      getMainWorkArea()
+    ])
 
-    await appWindow.setPosition(new LogicalPosition(position.x + dx, position.y + dy))
-    await clampWindowToBounds()
+    const minX = workArea.x
+    const minY = workArea.y
+    const maxX = workArea.x + workArea.width - size.width
+    const maxY = workArea.y + workArea.height - size.height
+
+    const position = {
+      x: clamp(rawPosition.x, minX, maxX),
+      y: clamp(rawPosition.y, minY, maxY)
+    }
+
+    if (position.x !== rawPosition.x || position.y !== rawPosition.y) {
+      await setWindowPosition(position.x, position.y, 'pre-walk-clamp')
+    }
+
+    const directions = getRandomDirectionOrder()
+    for (let index = 0; index < directions.length && index < 4; index += 1) {
+      const direction = directions[index]
+      const nextX = clamp(position.x + direction.x * WALK_DISTANCE_PX, minX, maxX)
+      const nextY = clamp(position.y + direction.y * WALK_DISTANCE_PX, minY, maxY)
+
+      if (nextX === position.x && nextY === position.y) {
+        continue
+      }
+
+      const moved = await setWindowPosition(nextX, nextY, 'random-walk')
+      if (moved) {
+        break
+      }
+    }
+  } catch (error) {
+    console.error('[mew] random walk step failed', error)
   } finally {
     walkBusy = false
   }
@@ -218,15 +278,16 @@ function closeInput(): void {
   chatForm.classList.add('hidden')
 }
 
+function closeChatUI(): void {
+  closeInput()
+  hideBubble()
+  chatInput.value = ''
+}
+
 function clearBubbleTimers(): void {
   if (typeTimer !== null) {
     window.clearInterval(typeTimer)
     typeTimer = null
-  }
-
-  if (bubbleHideTimer !== null) {
-    window.clearTimeout(bubbleHideTimer)
-    bubbleHideTimer = null
   }
 }
 
@@ -245,7 +306,6 @@ function showBubble(message: string): void {
   const chars = [...message]
 
   if (chars.length === 0) {
-    bubbleHideTimer = window.setTimeout(hideBubble, BUBBLE_AUTO_HIDE_MS)
     return
   }
 
@@ -259,8 +319,6 @@ function showBubble(message: string): void {
         window.clearInterval(typeTimer)
         typeTimer = null
       }
-
-      bubbleHideTimer = window.setTimeout(hideBubble, BUBBLE_AUTO_HIDE_MS)
     }
   }, TYPEWRITER_MS)
 }
@@ -292,6 +350,8 @@ async function triggerNativeDrag(): Promise<void> {
 
   try {
     await appWindow.startDragging()
+  } catch (error) {
+    console.error('[mew] start dragging failed', error)
   } finally {
     isDragging = false
     if (currentPetState === 'drag') {
@@ -308,7 +368,6 @@ function clearPointerTrack(): void {
 pet.addEventListener('pointerdown', (event) => {
   pointerTrack = {
     pointerId: event.pointerId,
-    downAt: performance.now(),
     startX: event.clientX,
     startY: event.clientY,
     dragTriggered: false
@@ -322,11 +381,13 @@ pet.addEventListener('pointermove', (event) => {
     return
   }
 
-  const heldMs = performance.now() - pointerTrack.downAt
   const movedPx = distance(event.clientX, event.clientY, pointerTrack.startX, pointerTrack.startY)
 
-  if (heldMs > HOLD_MS && movedPx > MOVE_THRESHOLD_PX) {
+  if (movedPx >= DRAG_TRIGGER_THRESHOLD_PX) {
     pointerTrack.dragTriggered = true
+    if (pet.hasPointerCapture(event.pointerId)) {
+      pet.releasePointerCapture(event.pointerId)
+    }
     void triggerNativeDrag()
   }
 })
@@ -336,9 +397,8 @@ pet.addEventListener('pointerup', (event) => {
     return
   }
 
-  const heldMs = performance.now() - pointerTrack.downAt
   const movedPx = distance(event.clientX, event.clientY, pointerTrack.startX, pointerTrack.startY)
-  const isClick = heldMs <= HOLD_MS && movedPx <= MOVE_THRESHOLD_PX
+  const isClick = movedPx <= CLICK_MOVE_THRESHOLD_PX
 
   if (isClick && !pointerTrack.dragTriggered) {
     setPetState('tap_react')
@@ -365,7 +425,7 @@ chatForm.addEventListener('submit', (event) => {
 chatInput.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
     event.preventDefault()
-    closeInput()
+    closeChatUI()
     return
   }
 
@@ -374,11 +434,10 @@ chatInput.addEventListener('keydown', (event) => {
   }
 })
 
-chatBubble.addEventListener('click', hideBubble)
-chatBubble.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter' || event.key === ' ') {
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && (inputVisible || !chatBubble.classList.contains('hidden'))) {
     event.preventDefault()
-    hideBubble()
+    closeChatUI()
   }
 })
 
