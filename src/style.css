@@ -1,96 +1,383 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
+  font-family: "Avenir Next", "Nunito", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+* {
+  box-sizing: border-box;
 }
-a:hover {
-  color: #535bf2;
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
 }
 
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+  user-select: none;
 }
 
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vanilla:hover {
-  filter: drop-shadow(0 0 2em #3178c6aa);
+.pet-shell {
+  position: absolute;
+  inset: 0;
 }
 
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+.pet {
+  width: 160px;
+  aspect-ratio: 1 / 1;
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: grid;
+  place-items: center;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  touch-action: none;
+  transform-origin: 50% 84%;
+  pointer-events: auto;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+.pet-media {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-origin: 50% 84%;
+}
+
+.pet-media img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 20px rgba(66, 42, 8, 0.26));
+  pointer-events: none;
+}
+
+.blink-eyes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.blink-eye {
+  position: absolute;
+  top: 62%;
+  width: 9%;
+  height: 2.2%;
+  border-radius: 999px;
+  background: rgba(52, 42, 31, 0.9);
+  transform-origin: center center;
+  transform: translate(-50%, -50%) scaleX(0.35);
+  opacity: 0;
+}
+
+.blink-eye-left {
+  left: 38%;
+}
+
+.blink-eye-right {
+  left: 62%;
+}
+
+.smile {
+  position: absolute;
+  left: 50%;
+  top: 71%;
+  width: 14%;
+  height: 7%;
+  border-bottom: 2.6px solid rgba(66, 52, 36, 0.9);
+  border-radius: 0 0 999px 999px;
+  transform: translate(-50%, -50%) scale(0.45);
+  transform-origin: center top;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chat-form,
+.chat-bubble {
+  position: absolute;
+  right: 16px;
+  pointer-events: auto;
+}
+
+.chat-form {
+  bottom: 182px;
+  width: 248px;
+  background: rgba(255, 250, 240, 0.94);
+  border: 1px solid rgba(122, 86, 41, 0.26);
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(67, 47, 20, 0.2);
+  padding: 8px;
+}
+
+.chat-input {
+  width: 100%;
+  border: 1px solid rgba(114, 83, 40, 0.28);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: #3d3123;
+  font: 500 14px/1.2 "Avenir Next", "Nunito", "PingFang SC", "Microsoft YaHei", sans-serif;
+  outline: none;
+}
+
+.chat-input:focus {
+  border-color: rgba(192, 118, 42, 0.66);
+  box-shadow: 0 0 0 2px rgba(255, 190, 114, 0.22);
+}
+
+.chat-bubble {
+  bottom: 228px;
+  max-width: 280px;
+  min-width: 148px;
+  text-align: left;
+  border: 1px solid rgba(122, 86, 41, 0.3);
+  background: rgba(255, 248, 233, 0.96);
+  color: #3f3325;
+  border-radius: 14px;
+  box-shadow: 0 9px 18px rgba(63, 45, 19, 0.22);
+  padding: 10px 12px;
+  font: 600 14px/1.45 "Avenir Next", "Nunito", "PingFang SC", "Microsoft YaHei", sans-serif;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: pointer;
+}
+
+.chat-bubble::after {
+  content: "";
+  position: absolute;
+  right: 20px;
+  bottom: -8px;
+  width: 14px;
+  height: 14px;
+  background: rgba(255, 248, 233, 0.96);
+  border-right: 1px solid rgba(122, 86, 41, 0.3);
+  border-bottom: 1px solid rgba(122, 86, 41, 0.3);
+  transform: rotate(45deg);
+}
+
+.chat-bubble:focus-visible {
+  outline: 2px solid rgba(192, 118, 42, 0.66);
+  outline-offset: 2px;
+}
+
+.hidden {
+  display: none;
+}
+
+.state-idle {
+  animation: idle-breathe 1.8s ease-in-out infinite;
+}
+
+.state-idle .pet-media {
+  animation: idle-sway 2.6s ease-in-out infinite;
+}
+
+.state-idle .blink-eye {
+  animation: idle-blink-eye 6.2s linear infinite;
+}
+
+.state-drag {
+  animation: drag-lift 340ms ease-in-out infinite alternate;
+}
+
+.state-drag .pet-media {
+  animation: drag-jitter 110ms linear infinite;
+}
+
+.state-tap-react {
+  animation: tap-bounce 520ms cubic-bezier(0.2, 0.85, 0.22, 1) 1 both;
+}
+
+.state-tap-react .pet-media {
+  animation: tap-surprise 520ms cubic-bezier(0.2, 0.85, 0.22, 1) 1 both;
+}
+
+.state-tap-react .pet-media img {
+  animation: tap-glow 520ms ease-out 1 both;
+}
+
+.state-tap-react .smile {
+  animation: tap-smile 520ms cubic-bezier(0.2, 0.85, 0.22, 1) 1 both;
+}
+
+@keyframes idle-breathe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
   }
-  a:hover {
-    color: #747bff;
+
+  50% {
+    transform: translateY(2px) scale(1.03);
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+@keyframes idle-sway {
+  0%,
+  100% {
+    transform: rotate(-1.5deg);
+  }
+
+  50% {
+    transform: rotate(1.5deg);
+  }
+}
+
+@keyframes idle-blink-eye {
+  0%,
+  7.1%,
+  8.4%,
+  48.3%,
+  49.5%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scaleX(0.35);
+  }
+
+  7.7%,
+  48.9% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scaleX(1.15);
+  }
+}
+
+@keyframes drag-lift {
+  from {
+    transform: translateY(-8px) scaleX(1.08) scaleY(0.93);
+  }
+
+  to {
+    transform: translateY(-12px) scaleX(0.94) scaleY(1.09);
+  }
+}
+
+@keyframes drag-jitter {
+  0% {
+    transform: translateX(0) rotate(0deg);
+  }
+
+  25% {
+    transform: translateX(-1px) rotate(-2deg);
+  }
+
+  50% {
+    transform: translateX(0) rotate(0deg);
+  }
+
+  75% {
+    transform: translateX(1px) rotate(2deg);
+  }
+
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+}
+
+@keyframes tap-bounce {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+
+  28% {
+    transform: translateY(-13px) scale(1.1);
+  }
+
+  52% {
+    transform: translateY(3px) scaleX(1.07) scaleY(0.91);
+  }
+
+  74% {
+    transform: translateY(-2px) scale(1.02);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes tap-surprise {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  26% {
+    transform: rotate(-5deg) scale(1.03);
+  }
+
+  52% {
+    transform: rotate(4deg) scale(0.99);
+  }
+
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+@keyframes tap-glow {
+  0% {
+    filter: drop-shadow(0 12px 20px rgba(66, 42, 8, 0.26)) brightness(1) saturate(1);
+  }
+
+  30% {
+    filter: drop-shadow(0 9px 16px rgba(66, 42, 8, 0.16)) drop-shadow(0 0 16px rgba(255, 219, 141, 0.68)) brightness(1.14) saturate(1.16);
+  }
+
+  55% {
+    filter: drop-shadow(0 10px 20px rgba(66, 42, 8, 0.2)) drop-shadow(0 0 10px rgba(255, 219, 141, 0.48)) brightness(1.08) saturate(1.08);
+  }
+
+  100% {
+    filter: drop-shadow(0 12px 20px rgba(66, 42, 8, 0.26)) brightness(1) saturate(1);
+  }
+}
+
+@keyframes tap-smile {
+  0%,
+  16%,
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.45);
+  }
+
+  34% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  60% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+
+  82% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .state-idle,
+  .state-idle .pet-media,
+  .state-idle .blink-eye,
+  .state-drag,
+  .state-drag .pet-media,
+  .state-tap-react,
+  .state-tap-react .pet-media,
+  .state-tap-react .pet-media img,
+  .state-tap-react .smile {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

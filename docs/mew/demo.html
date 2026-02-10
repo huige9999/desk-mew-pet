@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mew Pet State Demo</title>
+  <style>
+    :root {
+      --bg-top: #ffd18e;
+      --bg-bottom: #f9f4ec;
+      --text: #2f2a23;
+      --panel: rgba(255, 255, 255, 0.7);
+      --panel-border: rgba(123, 96, 62, 0.26);
+      --btn-idle: #f4ede4;
+      --btn-drag: #f3dcc0;
+      --btn-tap: #ffd39a;
+      --btn-active: #4e3f2a;
+      --shadow: 0 18px 32px rgba(66, 42, 8, 0.22);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.78), transparent 48%),
+        linear-gradient(170deg, var(--bg-top), var(--bg-bottom));
+      color: var(--text);
+      font-family: "Avenir Next", "Nunito", "PingFang SC", "Microsoft YaHei", sans-serif;
+      padding: 20px;
+    }
+
+    .stage {
+      width: min(92vw, 460px);
+      padding: 20px 18px 22px;
+      border-radius: 24px;
+      border: 1px solid var(--panel-border);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      display: grid;
+      gap: 16px;
+      justify-items: center;
+      backdrop-filter: blur(3px);
+    }
+
+    #pet {
+      width: min(46vw, 220px);
+      aspect-ratio: 1 / 1;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      user-select: none;
+      touch-action: manipulation;
+      transform-origin: 50% 84%;
+    }
+
+    .pet-media {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-origin: 50% 84%;
+    }
+
+    .pet-media img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+      filter: drop-shadow(0 14px 24px rgba(66, 42, 8, 0.32));
+      pointer-events: none;
+    }
+
+    .blink-eyes {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .blink-eye {
+      position: absolute;
+      top: 62%;
+      width: 9%;
+      height: 2.2%;
+      border-radius: 999px;
+      background: rgba(52, 42, 31, 0.9);
+      transform-origin: center center;
+      transform: translate(-50%, -50%) scaleX(0.35);
+      opacity: 0;
+    }
+
+    .blink-eye-left {
+      left: 38%;
+    }
+
+    .blink-eye-right {
+      left: 62%;
+    }
+
+    .smile {
+      position: absolute;
+      left: 50%;
+      top: 71%;
+      width: 14%;
+      height: 7%;
+      border-bottom: 2.6px solid rgba(66, 52, 36, 0.9);
+      border-radius: 0 0 999px 999px;
+      transform: translate(-50%, -50%) scale(0.45);
+      transform-origin: center top;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      width: 100%;
+    }
+
+    .controls button {
+      border: 1px solid rgba(74, 54, 28, 0.3);
+      border-radius: 12px;
+      padding: 10px 8px;
+      min-height: 44px;
+      color: var(--text);
+      font: 700 14px/1 "Avenir Next", "Nunito", sans-serif;
+      cursor: pointer;
+      transition: transform 120ms ease, box-shadow 160ms ease, color 160ms ease;
+    }
+
+    .controls button:hover {
+      transform: translateY(-1px);
+    }
+
+    .controls button:active {
+      transform: translateY(0);
+    }
+
+    #btnIdle {
+      background: var(--btn-idle);
+    }
+
+    #btnDrag {
+      background: var(--btn-drag);
+    }
+
+    #btnTap {
+      background: var(--btn-tap);
+    }
+
+    .controls button[data-active="true"] {
+      color: #fff;
+      background: var(--btn-active) !important;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    }
+
+    .hint {
+      width: 100%;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.55;
+      color: rgba(47, 42, 35, 0.88);
+    }
+
+    .state-idle {
+      animation: idle-breathe 1.8s ease-in-out infinite;
+    }
+
+    .state-idle .pet-media {
+      animation: idle-sway 2.6s ease-in-out infinite;
+    }
+
+    .state-idle .blink-eye {
+      animation: idle-blink-eye 6.2s linear infinite;
+    }
+
+    .state-drag {
+      animation: drag-lift 340ms ease-in-out infinite alternate;
+    }
+
+    .state-drag .pet-media {
+      animation: drag-jitter 110ms linear infinite;
+    }
+
+    .state-tap-react {
+      animation: tap-bounce 520ms cubic-bezier(0.2, 0.85, 0.22, 1) 1 both;
+    }
+
+    .state-tap-react .pet-media {
+      animation: tap-surprise 520ms cubic-bezier(0.2, 0.85, 0.22, 1) 1 both;
+    }
+
+    .state-tap-react .pet-media img {
+      animation: tap-glow 520ms ease-out 1 both;
+    }
+
+    .state-tap-react .smile {
+      animation: tap-smile 520ms cubic-bezier(0.2, 0.85, 0.22, 1) 1 both;
+    }
+
+    @keyframes idle-breathe {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(2px) scale(1.03); }
+    }
+
+    @keyframes idle-sway {
+      0%, 100% { transform: rotate(-1.5deg); }
+      50% { transform: rotate(1.5deg); }
+    }
+
+    @keyframes idle-blink-eye {
+      0%, 7.1%, 8.4%, 48.3%, 49.5%, 100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scaleX(0.35);
+      }
+      7.7%, 48.9% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scaleX(1.15);
+      }
+    }
+
+    @keyframes drag-lift {
+      from { transform: translateY(-8px) scaleX(1.08) scaleY(0.93); }
+      to { transform: translateY(-12px) scaleX(0.94) scaleY(1.09); }
+    }
+
+    @keyframes drag-jitter {
+      0% { transform: translateX(0) rotate(0deg); }
+      25% { transform: translateX(-1px) rotate(-2deg); }
+      50% { transform: translateX(0) rotate(0deg); }
+      75% { transform: translateX(1px) rotate(2deg); }
+      100% { transform: translateX(0) rotate(0deg); }
+    }
+
+    @keyframes tap-bounce {
+      0% { transform: translateY(0) scale(1); }
+      28% { transform: translateY(-13px) scale(1.1); }
+      52% { transform: translateY(3px) scaleX(1.07) scaleY(0.91); }
+      74% { transform: translateY(-2px) scale(1.02); }
+      100% { transform: translateY(0) scale(1); }
+    }
+
+    @keyframes tap-surprise {
+      0% { transform: rotate(0deg); }
+      26% { transform: rotate(-5deg) scale(1.03); }
+      52% { transform: rotate(4deg) scale(0.99); }
+      100% { transform: rotate(0deg) scale(1); }
+    }
+
+    @keyframes tap-glow {
+      0% {
+        filter: drop-shadow(0 14px 24px rgba(66, 42, 8, 0.32)) brightness(1) saturate(1);
+      }
+      30% {
+        filter:
+          drop-shadow(0 10px 20px rgba(66, 42, 8, 0.18))
+          drop-shadow(0 0 18px rgba(255, 219, 141, 0.72))
+          brightness(1.14)
+          saturate(1.16);
+      }
+      55% {
+        filter:
+          drop-shadow(0 10px 20px rgba(66, 42, 8, 0.22))
+          drop-shadow(0 0 12px rgba(255, 219, 141, 0.52))
+          brightness(1.08)
+          saturate(1.08);
+      }
+      100% {
+        filter: drop-shadow(0 14px 24px rgba(66, 42, 8, 0.32)) brightness(1) saturate(1);
+      }
+    }
+
+    @keyframes tap-smile {
+      0%, 16%, 100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.45);
+      }
+      34% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+      60% {
+        opacity: 0.95;
+        transform: translate(-50%, -50%) scale(1.08);
+      }
+      82% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.7);
+      }
+    }
+
+    @media (max-width: 520px) {
+      .stage {
+        padding: 16px 14px 18px;
+        border-radius: 20px;
+      }
+
+      .controls button {
+        font-size: 13px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .state-idle,
+      .state-idle .pet-media,
+      .state-idle .blink-eye,
+      .state-drag,
+      .state-drag .pet-media,
+      .state-tap-react,
+      .state-tap-react .pet-media,
+      .state-tap-react .pet-media img,
+      .state-tap-react .smile {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage">
+    <div id="pet" class="pet state-idle" title="点击触发 tap_react">
+      <div class="pet-media">
+        <img src="./cat.svg" alt="mew cat pet" />
+        <span class="blink-eyes" aria-hidden="true">
+          <span class="blink-eye blink-eye-left"></span>
+          <span class="blink-eye blink-eye-right"></span>
+        </span>
+        <span class="smile" aria-hidden="true"></span>
+      </div>
+    </div>
+
+    <div class="controls" aria-label="state controls">
+      <button id="btnIdle" type="button" data-state="idle" aria-pressed="true">idle</button>
+      <button id="btnDrag" type="button" data-state="drag" aria-pressed="false">drag</button>
+      <button id="btnTap" type="button" data-state="tap_react" aria-pressed="false">tap_react</button>
+    </div>
+
+    <p class="hint">
+      点击按钮切换状态。点击猫咪会触发一次 <code>tap_react</code>，结束后自动回到 <code>idle</code>。
+    </p>
+  </main>
+
+  <script>
+    const pet = document.getElementById("pet");
+    const controls = document.querySelectorAll(".controls button");
+
+    const STATE_CLASS = {
+      idle: "state-idle",
+      drag: "state-drag",
+      tap_react: "state-tap-react",
+    };
+
+    let currentState = "idle";
+
+    function clearStateClasses() {
+      pet.classList.remove(
+        STATE_CLASS.idle,
+        STATE_CLASS.drag,
+        STATE_CLASS.tap_react
+      );
+    }
+
+    function syncButtons() {
+      controls.forEach((button) => {
+        const isActive = button.dataset.state === currentState;
+        button.dataset.active = String(isActive);
+        button.setAttribute("aria-pressed", String(isActive));
+      });
+    }
+
+    function setState(nextState) {
+      if (!STATE_CLASS[nextState]) return;
+
+      currentState = nextState;
+      clearStateClasses();
+
+      if (nextState === "tap_react") {
+        // 强制重排，确保连续点击也能重播一次性动画。
+        void pet.offsetWidth;
+      }
+
+      pet.classList.add(STATE_CLASS[nextState]);
+      syncButtons();
+    }
+
+    controls.forEach((button) => {
+      button.addEventListener("click", () => setState(button.dataset.state));
+    });
+
+    pet.addEventListener("click", () => setState("tap_react"));
+
+    pet.addEventListener("animationend", (event) => {
+      if (event.animationName === "tap-bounce" && currentState === "tap_react") {
+        setState("idle");
+      }
+    });
+
+    setState("idle");
+  </script>
+</body>
+</html>

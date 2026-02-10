@@ -3,10 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri:build:portable": "tauri build --no-bundle"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.0",

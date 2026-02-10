@@ -19,5 +19,11 @@ pnpm tauri dev
 ## 如何打包？
 
 ```bash
-pnpm tauri build
+pnpm tauri:build:portable
 ```
+
+该命令会生成免安装便携版可执行文件（Windows）：
+
+`src-tauri/target/release/app.exe`
+
+双击 `app.exe` 即可直接运行。
