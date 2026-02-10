@@ -122,6 +122,31 @@ body {
   padding: 8px;
 }
 
+.chat-form-actions {
+  margin-top: 6px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chat-link-btn {
+  border: none;
+  background: transparent;
+  color: rgba(132, 83, 24, 0.95);
+  font: 600 12px/1.1 "Avenir Next", "Nunito", "PingFang SC", "Microsoft YaHei", sans-serif;
+  padding: 0;
+  cursor: pointer;
+}
+
+.chat-link-btn:hover {
+  text-decoration: underline;
+}
+
+.chat-link-btn:focus-visible {
+  outline: 2px solid rgba(192, 118, 42, 0.66);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
 .chat-input {
   width: 100%;
   border: 1px solid rgba(114, 83, 40, 0.28);
@@ -139,9 +164,11 @@ body {
 }
 
 .chat-bubble {
-  bottom: 228px;
-  max-width: 280px;
-  min-width: 148px;
+  inset: 10px;
+  max-width: none;
+  min-width: 0;
+  max-height: none;
+  overflow-y: auto;
   text-align: left;
   border: 1px solid rgba(122, 86, 41, 0.3);
   background: rgba(255, 248, 233, 0.96);
@@ -153,19 +180,11 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
   cursor: pointer;
+  z-index: 10;
 }
 
 .chat-bubble::after {
-  content: "";
-  position: absolute;
-  right: 20px;
-  bottom: -8px;
-  width: 14px;
-  height: 14px;
-  background: rgba(255, 248, 233, 0.96);
-  border-right: 1px solid rgba(122, 86, 41, 0.3);
-  border-bottom: 1px solid rgba(122, 86, 41, 0.3);
-  transform: rotate(45deg);
+  content: none;
 }
 
 .chat-bubble:focus-visible {
@@ -178,6 +197,8 @@ body {
   inset: 0;
   display: grid;
   place-items: center;
+  padding: 12px;
+  overflow-y: auto;
   background: rgba(26, 19, 11, 0.45);
   pointer-events: auto;
   z-index: 30;
@@ -185,11 +206,17 @@ body {
 
 .dialog-card {
   width: min(320px, calc(100% - 24px));
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
   border-radius: 14px;
   border: 1px solid rgba(113, 82, 42, 0.35);
   background: rgba(255, 249, 239, 0.98);
   box-shadow: 0 12px 30px rgba(49, 33, 13, 0.3);
   padding: 14px 14px 12px;
+}
+
+.dialog-card-config {
+  width: min(360px, calc(100% - 24px));
 }
 
 .dialog-title {
@@ -208,6 +235,7 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  margin-top: 4px;
 }
 
 .dialog-btn {
@@ -228,6 +256,38 @@ body {
 .dialog-btn:focus-visible {
   outline: 2px solid rgba(192, 118, 42, 0.66);
   outline-offset: 1px;
+}
+
+.config-form {
+  display: grid;
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+
+.config-field {
+  display: grid;
+  gap: 4px;
+}
+
+.config-label {
+  color: #5a4328;
+  font: 700 12px/1.2 "Avenir Next", "Nunito", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.config-input {
+  width: 100%;
+  border: 1px solid rgba(114, 83, 40, 0.28);
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: #3d3123;
+  font: 500 13px/1.2 "Avenir Next", "Nunito", "PingFang SC", "Microsoft YaHei", sans-serif;
+  outline: none;
+}
+
+.config-input:focus {
+  border-color: rgba(192, 118, 42, 0.66);
+  box-shadow: 0 0 0 2px rgba(255, 190, 114, 0.22);
 }
 
 .hidden {

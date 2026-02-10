@@ -59,6 +59,27 @@ type FirstSendFailedPayload = {
   message: string
 }
 
+type OpenAiConfig = {
+  openaiApiKey?: string
+  openaiBaseUrl?: string
+  openaiModel?: string
+}
+
+type ApprovalMode = 'default' | 'auto-edit' | 'yolo' | 'plan'
+
+type HeadlessConfig = {
+  workingDirectory?: string
+  approvalMode?: ApprovalMode
+}
+
+type StoredOpenAiConfig = {
+  openaiApiKey: string
+  openaiBaseUrl: string
+  openaiModel: string
+  workingDirectory: string
+  approvalMode: ApprovalMode
+}
+
 const WALK_INTERVAL_MS = 2000
 const WALK_DISTANCE_PX = 10
 const WALK_ANIMATION_DURATION_MS = 280
@@ -69,13 +90,19 @@ const CLICK_MAX_DURATION_MS = 200
 const STREAM_FLUSH_MS = 50
 const STREAM_BATCH_CHARS = 8
 const ROUND_SILENCE_MS = 800
+const FIRST_TOKEN_TIMEOUT_MS = 15000
 const ANSI_CSI_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]/g
 const ANSI_OSC_PATTERN = /\u001b\][^\u0007]*(\u0007|\u001b\\)/g
 
 const EMPTY_INPUT_HINT = '请说点什么～'
 const THINKING_HINT = '思考中…'
 const SESSION_INTERRUPTED_HINT = '会话已中断，请重试'
+const STREAM_UNPARSABLE_HINT = '收到终端控制输出，暂未解析到可展示文本。'
 const RETRY_FAILED_HINT = '重试失败，请在终端运行 qwen 并完成登录后再试。'
+const OPENAI_CONFIG_SAVED_HINT = '配置已保存'
+const OPENAI_CONFIG_STORAGE_KEY = 'mew_openai_compatible_config_v2'
+const LEGACY_OPENAI_CONFIG_STORAGE_KEY = 'mew_openai_compatible_config_v1'
+const DEFAULT_APPROVAL_MODE: ApprovalMode = 'default'
 
 const appWindow = getCurrentWindow()
 
@@ -91,10 +118,12 @@ let currentRoundId = 0
 let renderedStreamText = ''
 let pendingStreamText = ''
 let gotFirstToken = false
+let sawRawChunk = false
 
 let walkTimer: number | null = null
 let flushTimer: number | null = null
 let silenceTimer: number | null = null
+let firstTokenTimer: number | null = null
 
 const unlisteners: UnlistenFn[] = []
 
@@ -131,6 +160,9 @@ app.innerHTML = `
         maxlength="240"
         placeholder="输入后回车，内容会原样发给 qwen"
       />
+      <div class="chat-form-actions">
+        <button id="provider-config-trigger" class="chat-link-btn" type="button">配置</button>
+      </div>
     </form>
 
     <button id="chat-bubble" class="chat-bubble hidden" type="button"></button>
@@ -142,6 +174,51 @@ app.innerHTML = `
         <div class="dialog-actions">
           <button id="fail-ack" type="button" class="dialog-btn">我知道了</button>
           <button id="fail-retry" type="button" class="dialog-btn dialog-btn-primary">重试</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="provider-config-modal" class="dialog-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="provider-config-title">
+      <div class="dialog-card dialog-card-config">
+        <h2 id="provider-config-title" class="dialog-title">OpenAI 兼容配置</h2>
+        <p class="dialog-message">支持 OpenAI、Azure 或本地兼容端点。保存后会在 headless 调用 qwen 时注入环境变量，并按工作目录启动。</p>
+
+        <div class="config-form">
+          <label class="config-field" for="provider-openai-api-key">
+            <span class="config-label">OPENAI_API_KEY</span>
+            <input id="provider-openai-api-key" class="config-input" type="password" autocomplete="off" placeholder="必填（如果系统环境变量中未设置）" />
+          </label>
+
+          <label class="config-field" for="provider-openai-base-url">
+            <span class="config-label">OPENAI_BASE_URL</span>
+            <input id="provider-openai-base-url" class="config-input" type="text" autocomplete="off" placeholder="可选，例如 https://api.openai.com/v1" />
+          </label>
+
+          <label class="config-field" for="provider-openai-model">
+            <span class="config-label">OPENAI_MODEL</span>
+            <input id="provider-openai-model" class="config-input" type="text" autocomplete="off" placeholder="可选，例如 gpt-4o-mini" />
+          </label>
+
+          <label class="config-field" for="provider-working-directory">
+            <span class="config-label">工作目录</span>
+            <input id="provider-working-directory" class="config-input" type="text" autocomplete="off" placeholder="可选，例如 D:\\assets" />
+          </label>
+
+          <label class="config-field" for="provider-approval-mode">
+            <span class="config-label">审批模式</span>
+            <select id="provider-approval-mode" class="config-input">
+              <option value="default">default（默认，需审批）</option>
+              <option value="auto-edit">auto-edit（自动改文件）</option>
+              <option value="yolo">yolo（自动执行命令，高风险）</option>
+              <option value="plan">plan（规划模式）</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="dialog-actions">
+          <button id="provider-config-cancel" type="button" class="dialog-btn">取消</button>
+          <button id="provider-config-clear" type="button" class="dialog-btn">清空</button>
+          <button id="provider-config-save" type="button" class="dialog-btn dialog-btn-primary">保存</button>
         </div>
       </div>
     </div>
@@ -157,8 +234,38 @@ const firstFailTitle = document.querySelector<HTMLHeadingElement>('#fail-title')
 const firstFailMessage = document.querySelector<HTMLParagraphElement>('#fail-message')
 const firstFailAck = document.querySelector<HTMLButtonElement>('#fail-ack')
 const firstFailRetry = document.querySelector<HTMLButtonElement>('#fail-retry')
+const providerConfigTrigger = document.querySelector<HTMLButtonElement>('#provider-config-trigger')
+const providerConfigModal = document.querySelector<HTMLDivElement>('#provider-config-modal')
+const providerConfigApiKey = document.querySelector<HTMLInputElement>('#provider-openai-api-key')
+const providerConfigBaseUrl = document.querySelector<HTMLInputElement>('#provider-openai-base-url')
+const providerConfigModel = document.querySelector<HTMLInputElement>('#provider-openai-model')
+const providerConfigWorkingDirectory = document.querySelector<HTMLInputElement>('#provider-working-directory')
+const providerConfigApprovalMode = document.querySelector<HTMLSelectElement>('#provider-approval-mode')
+const providerConfigCancel = document.querySelector<HTMLButtonElement>('#provider-config-cancel')
+const providerConfigClear = document.querySelector<HTMLButtonElement>('#provider-config-clear')
+const providerConfigSave = document.querySelector<HTMLButtonElement>('#provider-config-save')
 
-if (!pet || !chatForm || !chatInput || !chatBubble || !firstFailModal || !firstFailTitle || !firstFailMessage || !firstFailAck || !firstFailRetry) {
+if (
+  !pet ||
+  !chatForm ||
+  !chatInput ||
+  !chatBubble ||
+  !firstFailModal ||
+  !firstFailTitle ||
+  !firstFailMessage ||
+  !firstFailAck ||
+  !firstFailRetry ||
+  !providerConfigTrigger ||
+  !providerConfigModal ||
+  !providerConfigApiKey ||
+  !providerConfigBaseUrl ||
+  !providerConfigModel ||
+  !providerConfigWorkingDirectory ||
+  !providerConfigApprovalMode ||
+  !providerConfigCancel ||
+  !providerConfigClear ||
+  !providerConfigSave
+) {
   throw new Error('Pet UI elements were not initialized correctly')
 }
 
@@ -166,6 +273,122 @@ const PET_STATE_CLASS: Record<PetAnimState, string> = {
   idle: 'state-idle',
   drag: 'state-drag',
   tap_react: 'state-tap-react'
+}
+
+function normalizeConfigValue(value: string): string {
+  return value.trim()
+}
+
+function normalizeApprovalMode(value: string): ApprovalMode {
+  if (value === 'auto-edit' || value === 'yolo' || value === 'plan') {
+    return value
+  }
+  return DEFAULT_APPROVAL_MODE
+}
+
+function normalizeWorkingDirectory(value: string): string {
+  return value.replace(/\r/g, '').split(/[\n;]+/)[0]?.trim() ?? ''
+}
+
+function loadOpenAiConfigFromStorage(): StoredOpenAiConfig {
+  const fallback: StoredOpenAiConfig = {
+    openaiApiKey: '',
+    openaiBaseUrl: '',
+    openaiModel: '',
+    workingDirectory: '',
+    approvalMode: DEFAULT_APPROVAL_MODE
+  }
+
+  window.localStorage.removeItem(LEGACY_OPENAI_CONFIG_STORAGE_KEY)
+  const stored = window.localStorage.getItem(OPENAI_CONFIG_STORAGE_KEY)
+  if (!stored) {
+    return fallback
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<StoredOpenAiConfig>
+    return {
+      openaiApiKey: typeof parsed.openaiApiKey === 'string' ? parsed.openaiApiKey : '',
+      openaiBaseUrl: typeof parsed.openaiBaseUrl === 'string' ? parsed.openaiBaseUrl : '',
+      openaiModel: typeof parsed.openaiModel === 'string' ? parsed.openaiModel : '',
+      workingDirectory: normalizeWorkingDirectory(typeof parsed.workingDirectory === 'string' ? parsed.workingDirectory : ''),
+      approvalMode: normalizeApprovalMode(typeof parsed.approvalMode === 'string' ? parsed.approvalMode : DEFAULT_APPROVAL_MODE)
+    }
+  } catch (error) {
+    console.warn('[mew] failed to parse stored OpenAI config, ignoring', error)
+    return fallback
+  }
+}
+
+function saveOpenAiConfigToStorage(config: StoredOpenAiConfig): void {
+  const isEmpty = config.openaiApiKey.length === 0
+    && config.openaiBaseUrl.length === 0
+    && config.openaiModel.length === 0
+    && config.workingDirectory.length === 0
+    && config.approvalMode === DEFAULT_APPROVAL_MODE
+  if (isEmpty) {
+    window.localStorage.removeItem(OPENAI_CONFIG_STORAGE_KEY)
+    return
+  }
+
+  window.localStorage.setItem(OPENAI_CONFIG_STORAGE_KEY, JSON.stringify(config))
+}
+
+function applyOpenAiConfigToInputs(config: StoredOpenAiConfig): void {
+  providerConfigApiKey.value = config.openaiApiKey
+  providerConfigBaseUrl.value = config.openaiBaseUrl
+  providerConfigModel.value = config.openaiModel
+  providerConfigWorkingDirectory.value = config.workingDirectory
+  providerConfigApprovalMode.value = config.approvalMode
+}
+
+function readOpenAiConfigFromInputs(): StoredOpenAiConfig {
+  return {
+    openaiApiKey: normalizeConfigValue(providerConfigApiKey.value),
+    openaiBaseUrl: normalizeConfigValue(providerConfigBaseUrl.value),
+    openaiModel: normalizeConfigValue(providerConfigModel.value),
+    workingDirectory: normalizeWorkingDirectory(providerConfigWorkingDirectory.value),
+    approvalMode: normalizeApprovalMode(providerConfigApprovalMode.value)
+  }
+}
+
+function buildOpenAiConfigPayload(): OpenAiConfig | null {
+  const config = readOpenAiConfigFromInputs()
+  const payload: OpenAiConfig = {}
+
+  if (config.openaiApiKey.length > 0) {
+    payload.openaiApiKey = config.openaiApiKey
+  }
+  if (config.openaiBaseUrl.length > 0) {
+    payload.openaiBaseUrl = config.openaiBaseUrl
+  }
+  if (config.openaiModel.length > 0) {
+    payload.openaiModel = config.openaiModel
+  }
+
+  if (!payload.openaiApiKey && !payload.openaiBaseUrl && !payload.openaiModel) {
+    return null
+  }
+
+  return payload
+}
+
+function buildHeadlessConfigPayload(): HeadlessConfig | null {
+  const config = readOpenAiConfigFromInputs()
+  const payload: HeadlessConfig = {}
+  if (config.workingDirectory.length > 0) {
+    payload.workingDirectory = config.workingDirectory
+  }
+
+  if (config.approvalMode !== DEFAULT_APPROVAL_MODE) {
+    payload.approvalMode = config.approvalMode
+  }
+
+  if (!payload.workingDirectory && !payload.approvalMode) {
+    return null
+  }
+
+  return payload
 }
 
 function clearPetStateClasses(): void {
@@ -225,6 +448,11 @@ function clearStreamTimers(): void {
     window.clearTimeout(silenceTimer)
     silenceTimer = null
   }
+
+  if (firstTokenTimer !== null) {
+    window.clearTimeout(firstTokenTimer)
+    firstTokenTimer = null
+  }
 }
 
 function hideBubble(): void {
@@ -256,6 +484,10 @@ function flushPendingStream(): void {
     gotFirstToken = true
     renderedStreamText = ''
     chatState = 'streaming'
+    if (firstTokenTimer !== null) {
+      window.clearTimeout(firstTokenTimer)
+      firstTokenTimer = null
+    }
   }
 
   renderedStreamText += pendingStreamText
@@ -280,30 +512,67 @@ function resetSilenceTimer(): void {
 
   silenceTimer = window.setTimeout(() => {
     flushPendingStream()
-    if (chatState !== 'error') {
-      chatState = 'round_done'
+    if (chatState === 'error') {
+      silenceTimer = null
+      return
     }
+
+    if (!gotFirstToken && sawRawChunk) {
+      showBubbleInstant(STREAM_UNPARSABLE_HINT)
+      chatState = 'error'
+      silenceTimer = null
+      return
+    }
+
+    chatState = 'round_done'
     silenceTimer = null
   }, ROUND_SILENCE_MS)
 }
 
+function resetFirstTokenTimer(): void {
+  if (firstTokenTimer !== null) {
+    window.clearTimeout(firstTokenTimer)
+  }
+
+  firstTokenTimer = window.setTimeout(() => {
+    if (chatState !== 'waiting_first_token' || gotFirstToken) {
+      firstTokenTimer = null
+      return
+    }
+
+    console.error('[mew] first token timeout from qwen stream')
+    showBubbleInstant(SESSION_INTERRUPTED_HINT)
+    chatState = 'error'
+    firstTokenTimer = null
+  }, FIRST_TOKEN_TIMEOUT_MS)
+}
+
 function startRound(roundId: number): void {
   clearStreamTimers()
+  closeInput()
 
   currentRoundId = roundId
   renderedStreamText = ''
   pendingStreamText = ''
   gotFirstToken = false
+  sawRawChunk = false
   chatState = 'waiting_first_token'
 
   showBubbleInstant(THINKING_HINT)
-  resetSilenceTimer()
+  resetFirstTokenTimer()
 }
 
 function appendChunk(roundId: number, chunk: string): void {
   if (roundId !== currentRoundId) {
     return
   }
+
+  sawRawChunk = true
+  if (!gotFirstToken && firstTokenTimer !== null) {
+    window.clearTimeout(firstTokenTimer)
+    firstTokenTimer = null
+  }
+  resetSilenceTimer()
 
   const sanitizedChunk = chunk
     .replace(ANSI_CSI_PATTERN, '')
@@ -315,7 +584,6 @@ function appendChunk(roundId: number, chunk: string): void {
   }
 
   pendingStreamText += sanitizedChunk
-  resetSilenceTimer()
 
   if ([...pendingStreamText].length >= STREAM_BATCH_CHARS) {
     flushPendingStream()
@@ -335,6 +603,40 @@ function openFirstFailModal(title: string, message: string): void {
 function closeFirstFailModal(): void {
   firstFailModal.classList.add('hidden')
   firstFailModalVisible = false
+}
+
+function openProviderConfigModal(): void {
+  providerConfigModal.classList.remove('hidden')
+  providerConfigApiKey.focus()
+  providerConfigApiKey.select()
+}
+
+function closeProviderConfigModal(): void {
+  providerConfigModal.classList.add('hidden')
+}
+
+function saveProviderConfig(): void {
+  const config = readOpenAiConfigFromInputs()
+  saveOpenAiConfigToStorage(config)
+  closeProviderConfigModal()
+  showBubbleInstant(OPENAI_CONFIG_SAVED_HINT)
+}
+
+function clearProviderConfig(): void {
+  applyOpenAiConfigToInputs({
+    openaiApiKey: '',
+    openaiBaseUrl: '',
+    openaiModel: '',
+    workingDirectory: '',
+    approvalMode: DEFAULT_APPROVAL_MODE
+  })
+  saveOpenAiConfigToStorage({
+    openaiApiKey: '',
+    openaiBaseUrl: '',
+    openaiModel: '',
+    workingDirectory: '',
+    approvalMode: DEFAULT_APPROVAL_MODE
+  })
 }
 
 async function retryLastFailedInput(): Promise<void> {
@@ -383,7 +685,11 @@ async function submitInput(): Promise<void> {
   }
 
   try {
-    const ack = await invoke<SendAck>('qwen_send', { input: raw })
+    const ack = await invoke<SendAck>('qwen_send', {
+      input: raw,
+      openaiConfig: buildOpenAiConfigPayload(),
+      headlessConfig: buildHeadlessConfigPayload()
+    })
     if (!ack.ok) {
       showBubbleInstant(SESSION_INTERRUPTED_HINT)
       chatState = 'error'
@@ -694,7 +1000,35 @@ firstFailRetry.addEventListener('click', () => {
   void retryLastFailedInput()
 })
 
+providerConfigTrigger.addEventListener('click', () => {
+  openProviderConfigModal()
+})
+
+providerConfigCancel.addEventListener('click', () => {
+  closeProviderConfigModal()
+})
+
+providerConfigSave.addEventListener('click', () => {
+  saveProviderConfig()
+})
+
+providerConfigClear.addEventListener('click', () => {
+  clearProviderConfig()
+})
+
+providerConfigModal.addEventListener('click', (event) => {
+  if (event.target === providerConfigModal) {
+    closeProviderConfigModal()
+  }
+})
+
 window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !providerConfigModal.classList.contains('hidden')) {
+    event.preventDefault()
+    closeProviderConfigModal()
+    return
+  }
+
   if (event.key === 'Escape' && (inputVisible || !chatBubble.classList.contains('hidden'))) {
     event.preventDefault()
     closeChatUI()
@@ -718,6 +1052,7 @@ window.addEventListener('beforeunload', () => {
 })
 
 setPetState('idle')
+applyOpenAiConfigToInputs(loadOpenAiConfigFromStorage())
 void clampWindowToBounds()
 void setupQwenEventListeners().catch((error) => {
   console.error('[mew] failed to register qwen event listeners', error)
